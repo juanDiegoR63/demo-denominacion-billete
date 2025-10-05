@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Cámara</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        video {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .info {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎥 Prueba de Cámara</h1>
+    <div class="info" id="info">
+        <p>Estado: Listo para probar</p>
+    </div>
+    
+    <button onclick="testCamera()">📷 Probar Cámara</button>
+    <button onclick="stopCamera()">⏹️ Detener</button>
+    
+    <br><br>
+    <video id="video" autoplay playsinline muted></video>
+    
+    <div class="info">
+        <h3>Información del Navegador:</h3>
+        <p id="browser-info"></p>
+    </div>
+
+    <script>
+        let stream = null;
+        const video = document.getElementById('video');
+        const info = document.getElementById('info');
+        const browserInfo = document.getElementById('browser-info');
+
+        // Mostrar info del navegador
+        browserInfo.innerHTML = `
+            <strong>Navegador:</strong> ${navigator.userAgent}<br>
+            <strong>Plataforma:</strong> ${navigator.platform}<br>
+            <strong>Soporta getUserMedia:</strong> ${!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)}
+        `;
+
+        async function testCamera() {
+            try {
+                info.innerHTML = '<p>🔄 Solicitando acceso a la cámara...</p>';
+                
+                // Verificar soporte
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Tu navegador no soporta acceso a la cámara');
+                }
+
+                // Solicitar cámara
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+
+                video.srcObject = stream;
+                await video.play();
+
+                info.innerHTML = '<p>✅ ¡Cámara funcionando correctamente!</p>';
+                
+                // Mostrar info del stream
+                const tracks = stream.getVideoTracks();
+                if (tracks.length > 0) {
+                    const settings = tracks[0].getSettings();
+                    info.innerHTML += `
+                        <p><strong>Resolución:</strong> ${settings.width}x${settings.height}</p>
+                        <p><strong>Dispositivo:</strong> ${tracks[0].label}</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                info.innerHTML = `<p>❌ Error: ${error.name}</p><p>${error.message}</p>`;
+                
+                if (error.name === 'NotAllowedError') {
+                    info.innerHTML += '<p>⚠️ Debes permitir el acceso a la cámara</p>';
+                } else if (error.name === 'NotFoundError') {
+                    info.innerHTML += '<p>⚠️ No se encontró ninguna cámara</p>';
+                }
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                stream = null;
+                info.innerHTML = '<p>⏹️ Cámara detenida</p>';
+            }
+        }
+    </script>
+</body>
+</html>
