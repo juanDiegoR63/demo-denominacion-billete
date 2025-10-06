@@ -220,10 +220,7 @@ function App() {
                     <AiOutlineLoading3Quarters className="loading-icon" />
                     <span>Analizando...</span>
                   </>
-                ) : (
-                  <>
-                    <span>Empezar a identificar</span>
-                  </>
+                ) : (<span>Listo para capturar</span>
                 )}
               </div>
             </div>
