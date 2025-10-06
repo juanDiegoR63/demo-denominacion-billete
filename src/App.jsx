@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { analyzeBanknote } from './services/banknoteAnalyzer';
+import { AiOutlineCamera } from 'react-icons/ai';
+import { BsSoundwave } from 'react-icons/bs';
+import { MdWarning, MdError } from 'react-icons/md';
+import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 import './App.css';
 
 function App() {
@@ -8,6 +12,7 @@ function App() {
   const [error, setError] = useState(null);
   const [stream, setStream] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
+  const [photoTaken, setPhotoTaken] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const speechSynthRef = useRef(window.speechSynthesis);
@@ -70,7 +75,8 @@ function App() {
       return;
     }
 
-    // Reproducir sonido de captura
+    // Mostrar mensaje de foto tomada
+    setPhotoTaken(true);
     speak("Foto capturada, analizando billete");
 
     const context = canvas.getContext('2d');
@@ -82,49 +88,53 @@ function App() {
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
     setCapturedImage(imageDataUrl);
     
-    // Analizar la imagen
-    setAnalyzing(true);
     setError(null);
     setResult(null);
 
-    try {
-      const analysisResult = await analyzeBanknote(imageDataUrl);
+    // Pequeña pausa para mostrar el mensaje de foto tomada, luego analizar
+    setTimeout(async () => {
+      setPhotoTaken(false);
+      setAnalyzing(true);
 
-      if (analysisResult.success) {
-        const data = analysisResult.data;
-        setResult(data);
+      try {
+        const analysisResult = await analyzeBanknote(imageDataUrl);
 
-        // Leer el resultado en voz alta
-        if (data.esBillete) {
-          speak(data.mensajeVoz, 0.85);
+        if (analysisResult.success) {
+          const data = analysisResult.data;
+          setResult(data);
+
+          // Leer el resultado en voz alta
+          if (data.esBillete) {
+            speak(data.mensajeVoz, 0.85);
+          } else {
+            // Si no es un billete, leer las instrucciones
+            speak(data.mensajeVoz + ". " + data.instrucciones, 0.85);
+          }
         } else {
-          // Si no es un billete, leer las instrucciones
-          speak(data.mensajeVoz + ". " + data.instrucciones, 0.85);
+          const errorMsg = analysisResult.error || 'Error al procesar la imagen';
+          setError(errorMsg);
+          speak(errorMsg);
         }
-      } else {
-        const errorMsg = analysisResult.error || 'Error al procesar la imagen';
+      } catch (err) {
+        const errorMsg = 'Error al procesar la imagen. Por favor, intenta de nuevo.';
         setError(errorMsg);
         speak(errorMsg);
+        console.error(err);
+      } finally {
+        setAnalyzing(false);
+        // Limpiar después de 5 segundos y permitir nueva captura
+        setTimeout(() => {
+          setCapturedImage(null);
+          setResult(null);
+          setError(null);
+          speak("Listo para capturar otro billete. Toque el botón del centro");
+        }, 5000);
       }
-    } catch (err) {
-      const errorMsg = 'Error al procesar la imagen. Por favor, intenta de nuevo.';
-      setError(errorMsg);
-      speak(errorMsg);
-      console.error(err);
-    } finally {
-      setAnalyzing(false);
-      // Limpiar después de 5 segundos y permitir nueva captura
-      setTimeout(() => {
-        setCapturedImage(null);
-        setResult(null);
-        setError(null);
-        speak("Listo para capturar otro billete. Toque el botón del centro");
-      }, 5000);
-    }
+    }, 1000);
   };
 
   const handleButtonClick = () => {
-    if (analyzing) return;
+    if (analyzing || photoTaken) return;
     
     // Vibración táctil si está disponible
     if (navigator.vibrate) {
@@ -153,7 +163,7 @@ function App() {
   };
 
   return (
-    <div className="app-accessible">
+    <div className="app-modern">
       {/* Video de cámara siempre activo (oculto visualmente) */}
       <video
         ref={videoRef}
@@ -163,65 +173,104 @@ function App() {
       />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Botón grande central */}
-      <div className="main-container">
-        <h1 className="app-title-accessible">
-          💵 Identificador de Billetes Colombianos
-        </h1>
-
-        <button
-          className={`capture-button-large ${analyzing ? 'analyzing' : ''}`}
-          onClick={handleButtonClick}
-          disabled={analyzing}
-          aria-label="Capturar y analizar billete"
-        >
-          {analyzing ? (
-            <>
-              <div className="spinner-large"></div>
-              <span>Analizando...</span>
-            </>
-          ) : (
-            <>
-              <span className="camera-icon-large">📸</span>
-              <span className="button-text">CAPTURAR BILLETE</span>
-            </>
-          )}
-        </button>
-
-        {/* Resultado visual (también se lee en voz) */}
-        {result && !analyzing && result.esBillete && (
-          <div 
-            className="result-display"
-            style={{ backgroundColor: getBanknoteColor(result.denominacion) }}
-          >
-            <div className="denomination-large">
-              {formatDenomination(result.denominacion)}
+      <main className="main-content">
+        <div className="content-container">
+          <h2 className="main-title">
+            Identifica tu billete colombiano
+          </h2>
+          <p className="main-subtitle">
+            Toma una foto para identificar la denominación de tu billete al instante.
+          </p>
+          
+          <div className="identification-section">
+            <div 
+              className={`identification-card clickable-card ${analyzing ? 'analyzing' : ''} ${photoTaken ? 'photo-taken' : ''}`}
+              onClick={handleButtonClick}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleButtonClick();
+                }
+              }}
+              aria-label="Capturar y analizar billete"
+              style={{
+                cursor: (analyzing || photoTaken) ? 'not-allowed' : 'pointer',
+                opacity: (analyzing || photoTaken) ? 0.7 : 1
+              }}
+            >
+              <h3 className="card-title">
+                    <AiOutlineCamera className="camera-icon" />
+                <br />
+                Toca para Identificar
+              </h3>
+              <p className="card-description">
+                Usa tu cámara para identificar el billete o selecciona una imagen de tu galería.
+              </p>
+              
+              <div className="card-status">
+                {photoTaken ? (
+                  <>
+                    <span className="photo-taken-icon">✓</span>
+                    <span>¡Foto tomada!</span>
+                  </>
+                ) : analyzing ? (
+                  <>
+                    <AiOutlineLoading3Quarters className="loading-icon" />
+                    <span>Analizando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Empezar a identificar</span>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="currency-text">Pesos Colombianos</div>
-            <div className="color-indicator">Color: {result.color}</div>
           </div>
-        )}
 
-        {result && !analyzing && !result.esBillete && (
-          <div className="instructions-display">
-            <div className="warning-icon">⚠️</div>
-            <p className="instructions-text">{result.instrucciones}</p>
+          {/* Resultado visual */}
+          {result && !analyzing && result.esBillete && (
+            <div className="result-container">
+              <div 
+                className="banknote-result"
+                style={{ backgroundColor: getBanknoteColor(result.denominacion) }}
+              >
+                <div className="modern-denomination-value">
+                  {formatDenomination(result.denominacion)}
+                </div>
+                <div className="currency-label">Pesos Colombianos</div>
+                <div className="color-info">Color: {result.color}</div>
+              </div>
+            </div>
+          )}
+
+          {result && !analyzing && !result.esBillete && (
+            <div className="warning-container">
+              <MdWarning className="modern-warning-icon" />
+              <p className="warning-text">{result.instrucciones}</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="error-container">
+              <MdError className="modern-error-icon" />
+              <p className="error-text">{error}</p>
+            </div>
+          )}
+
+          {/* Indicador de estado de voz */}
+          <div className="voice-status">
+            <BsSoundwave className="voice-icon" />
+            <span>Asistente de voz activo</span>
           </div>
-        )}
-
-        {error && (
-          <div className="error-display">
-            <div className="error-icon">❌</div>
-            <p>{error}</p>
-          </div>
-        )}
-
-        {/* Indicador de estado de voz */}
-        <div className="voice-indicator">
-          <span className="speaker-icon">🔊</span>
-          <span>Asistente de voz activo</span>
         </div>
-      </div>
+
+        <p className="disclaimer">
+          Esta aplicación es solo para fines informativos y no debe usarse como única fuente de verificación. 
+          Consulte siempre fuentes oficiales para una identificación precisa de la moneda.
+        </p>
+      </main>
     </div>
   );
 }
