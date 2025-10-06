@@ -122,13 +122,13 @@ function App() {
         console.error(err);
       } finally {
         setAnalyzing(false);
-        // Limpiar después de 5 segundos y permitir nueva captura
+        // Limpiar después de 10 segundos y permitir nueva captura
         setTimeout(() => {
           setCapturedImage(null);
           setResult(null);
           setError(null);
-          speak("Listo para capturar otro billete. Toque el botón del centro");
-        }, 5000);
+          speak("Listo para capturar otro billete. Toque la tarjeta del centro");
+        }, 10000);
       }
     }, 1000);
   };
